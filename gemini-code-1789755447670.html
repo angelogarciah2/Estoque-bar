@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Estoque Bar — Painel de Contagem</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg:#14110F;
+  --surface:#1E1A15;
+  --surface2:#262019;
+  --border:#3A2F24;
+  --amber:#E8A33D;
+  --amber-dim:#B97F2A;
+  --teal:#4FA095;
+  --text:#F2E9DD;
+  --muted:#A79684;
+  --danger:#D9603B;
+  --radius:10px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;}
+body{-webkit-font-smoothing:antialiased;}
+h1,h2,h3{font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.04em;margin:0;}
+button{font-family:inherit;cursor:pointer;}
+input,select{font-family:inherit;font-size:16px;}
+a{color:var(--amber);}
+::selection{background:var(--amber);color:#14110F;}
+
+#app{max-width:640px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
+
+.loading{padding:40px 20px;text-align:center;color:var(--muted);font-family:'Oswald',sans-serif;letter-spacing:.08em;text-transform:uppercase;}
+
+/* Topbar */
+.topbar{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,var(--bg) 80%,rgba(20,17,15,0));backdrop-filter:blur(4px);padding:16px 16px 0;}
+.brand{display:flex;align-items:baseline;gap:8px;padding:0 2px 10px;}
+.brand-mark{color:var(--amber);font-size:10px;}
+.brand-name{font-family:'Oswald',sans-serif;font-weight:600;font-size:20px;letter-spacing:.06em;}
+.brand-sub{font-size:11px;color:var(--muted);letter-spacing:.14em;margin-left:8px;font-weight:500;}
+.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:4px;}
+.tab{flex:1;background:transparent;border:none;color:var(--muted);padding:10px 8px;border-radius:7px;font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;transition:background .15s,color .15s;}
+.tab.active{background:var(--amber);color:#1B140A;}
+.tab:not(.active):hover{color:var(--text);}
+.tab:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+
+#view{padding:16px;flex:1;}
+
+/* Config banner */
+.config-banner{background:rgba(217,96,59,.14);border:1px solid rgba(217,96,59,.4);color:#F0B39C;padding:10px 12px;border-radius:var(--radius);font-size:13px;margin-bottom:14px;cursor:pointer;}
+.config-banner:hover{background:rgba(217,96,59,.22);}
+
+/* Progress */
+.progress-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;}
+.progress-inner{display:flex;align-items:center;gap:16px;}
+.jigger-svg{width:52px;height:92px;flex-shrink:0;}
+.progress-copy{flex:1;}
+.progress-pct{font-family:'Oswald',sans-serif;font-size:32px;font-weight:600;color:var(--amber);line-height:1;}
+.progress-sub{font-size:13px;color:var(--muted);margin-top:4px;}
+
+/* Filters */
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center;}
+.search-input{flex:1;min-width:140px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 12px;}
+.search-input::placeholder{color:var(--muted);}
+#cat-filter{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 8px;max-width:150px;}
+.check-inline{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);white-space:nowrap;}
+.check-inline input{accent-color:var(--amber);width:16px;height:16px;}
+
+/* Category groups */
+.cat-group{margin-bottom:10px;}
+.cat-header{width:100%;display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);}
+.chevron{display:inline-block;transition:transform .15s;color:var(--amber);font-size:16px;}
+.chevron.open{transform:rotate(90deg);}
+.cat-name{font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;flex:1;text-align:left;}
+.cat-count{font-family:var(--mono);font-size:12px;color:var(--muted);}
+.cat-items{padding-top:8px;display:flex;flex-direction:column;gap:8px;}
+
+/* Item card */
+.item-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;transition:border-color .15s;}
+.item-card.counted{border-color:var(--teal);}
+.item-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.item-name{font-weight:600;font-size:14px;}
+.counted-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap;}
+.counted-toggle input{accent-color:var(--teal);width:17px;height:17px;}
+
+.tally{display:inline-flex;align-items:center;gap:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.tally button{width:38px;height:38px;background:transparent;border:none;color:var(--amber);font-size:18px;font-weight:700;}
+.tally button:hover{background:rgba(232,163,61,.12);}
+.tally-num{font-family:var(--mono);font-size:16px;width:58px;text-align:center;background:transparent;border:1px solid transparent;border-radius:5px;color:var(--text);padding:6px 2px;}
+.tally-num:hover,.tally-num:focus{border-color:var(--border);background:var(--surface);}
+.tally-num::-webkit-outer-spin-button,.tally-num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.tally-num{-moz-appearance:textfield;}
+.tally.small .tally-num{width:48px;font-size:15px;padding:4px 2px;}
+.tally.small button{width:32px;height:32px;font-size:15px;}
+.tally-unit{margin-left:8px;font-size:12px;color:var(--muted);}
+
+.field-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.field-row label{font-size:12px;color:var(--muted);flex:1;}
+.num-input{width:96px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 9px;font-family:var(--mono);}
+.unit-suffix{font-size:12px;color:var(--muted);width:24px;}
+
+.warn-row{font-size:12px;color:var(--danger);margin:4px 0 8px;}
+.open-bottle-block{border-top:1px dashed var(--border);padding-top:10px;margin-top:4px;}
+.open-bottle-block > label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
+.segmented{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:7px;overflow:hidden;margin-bottom:8px;width:fit-content;}
+.seg{padding:6px 12px;background:transparent;border:none;color:var(--muted);font-size:12px;font-weight:600;}
+.seg.active{background:var(--amber);color:#1B140A;}
+.calc-line{font-size:13px;margin-top:6px;color:var(--text);}
+.calc-line strong{color:var(--amber);font-family:var(--mono);}
+.muted{color:var(--muted);}
+
+.empty-state{text-align:center;padding:40px 10px;color:var(--muted);font-size:14px;}
+
+/* Cadastro */
+.cadastro-head{display:flex;gap:8px;margin-bottom:14px;}
+#cad-search{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 12px;}
+.cat-label{font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px;padding:0 2px;}
+.cat-label:first-child{margin-top:0;}
+.cad-row{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 12px;margin-bottom:6px;}
+.cad-row:hover{border-color:var(--amber-dim);}
+.cad-name{flex:1;font-size:14px;}
+.badge{font-size:10px;font-weight:700;letter-spacing:.04em;padding:3px 7px;border-radius:5px;font-family:var(--mono);}
+.badge-un{background:rgba(79,160,149,.18);color:var(--teal);}
+.badge-vol{background:rgba(232,163,61,.18);color:var(--amber);}
+.badge-kg{background:rgba(167,150,132,.18);color:var(--muted);}
+.badge-warn{background:rgba(217,96,59,.18);color:var(--danger);}
+
+/* Buttons */
+.btn-primary{background:var(--amber);color:#1B140A;border:none;border-radius:8px;padding:10px 16px;font-weight:700;font-size:13px;}
+.btn-primary:hover{background:#F0B156;}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px;}
+.btn-ghost:hover{border-color:var(--amber-dim);}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid rgba(217,96,59,.4);border-radius:8px;padding:9px 14px;font-size:13px;}
+.btn-danger:hover{background:rgba(217,96,59,.12);}
+.btn-danger-solid{background:var(--danger);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:700;font-size:13px;}
+.btn-danger-solid:hover{background:#c94f2c;}
+.confirm-modal{max-width:400px;}
+.confirm-message{font-size:14px;line-height:1.55;color:var(--text);margin:6px 0;}
+.icon-btn{background:transparent;border:none;color:var(--muted);font-size:16px;padding:4px 6px;}
+.icon-btn:hover{color:var(--text);}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(10,8,6,.65);display:flex;align-items:flex-end;justify-content:center;z-index:100;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px 14px 0 0;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;padding:0;}
+@media(min-width:640px){.modal-overlay{align-items:center;}.modal{border-radius:14px;}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);}
+.modal-body{padding:16px 18px;}
+.form-row{margin-bottom:14px;}
+.form-row label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
+.form-row input,.form-row select{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 12px;}
+.field-hint{display:block;font-size:11px;color:var(--muted);margin-top:5px;}
+.modal-foot{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-top:1px solid var(--border);gap:10px;position:sticky;bottom:0;background:var(--surface);}
+.modal-foot > div{display:flex;gap:8px;}
+
+/* Resumo */
+.resumo-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;}
+.resumo-title{font-family:'Oswald',sans-serif;font-size:18px;letter-spacing:.04em;}
+.resumo-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.resumo-actions{display:flex;gap:8px;}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);}
+.resumo-table{width:100%;border-collapse:collapse;font-size:13px;min-width:480px;}
+.resumo-table th{text-align:left;font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:10px 12px;background:var(--surface2);border-bottom:1px solid var(--border);position:sticky;top:0;}
+.resumo-table td{padding:9px 12px;border-bottom:1px solid var(--border);}
+.resumo-table tr:last-child td{border-bottom:none;}
+.mono{font-family:var(--mono);}
+.status-pill{font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;letter-spacing:.03em;}
+.status-contado{background:rgba(79,160,149,.18);color:var(--teal);}
+.status-pendente{background:rgba(167,150,132,.18);color:var(--muted);}
+
+/* Toast */
+.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:200;box-shadow:0 6px 20px rgba(0,0,0,.4);}
+.toast.show{opacity:1;transform:translate(-50%,0);}
+
+@media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important;}}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">Carregando painel…</div></div>
+
+<script>
+// --- ADAPTADOR PARA TESTAR NO NAVEGADOR ---
+if (!window.storage) {
+  window.storage = {
+    get: async (key) => {
+      const v = localStorage.getItem(key);
+      return v ? { value: v } : null;
+    },
+    set: async (key, val) => {
+      localStorage.setItem(key, val);
+    }
+  };
+}
+// ------------------------------------------
+
+/* ---------- Default catalog (imported from the user's spreadsheet) ---------- */
+const DEFAULT_PRODUCTS = [
+  // Bar
+  {id:'p1',name:'Cachaça Sagatiba',category:'Bar',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p2',name:'Beats Senses LN',category:'Bar',unitType:'UN'},
+  {id:'p3',name:'Beats Tropical LN',category:'Bar',unitType:'UN'},
+  {id:'p4',name:'Brahma 600ml',category:'Bar',unitType:'UN'},
+  {id:'p5',name:'Brutal Fruit LN',category:'Bar',unitType:'UN'},
+  {id:'p6',name:'Budweiser LN',category:'Bar',unitType:'UN'},
+  {id:'p7',name:'Budweiser Zero LN',category:'Bar',unitType:'UN'},
+  {id:'p8',name:'Corona 600ml',category:'Bar',unitType:'UN'},
+  {id:'p9',name:'Corona LN',category:'Bar',unitType:'UN'},
+  {id:'p10',name:'Corona Zero LN',category:'Bar',unitType:'UN'},
+  {id:'p11',name:'Original 600ml',category:'Bar',unitType:'UN'},
+  {id:'p12',name:'Patagonia Pilsener LN',category:'Bar',unitType:'UN'},
+  {id:'p13',name:'Smirnoff Ice',category:'Bar',unitType:'UN'},
+  {id:'p14',name:'Spaten 600ml',category:'Bar',unitType:'UN'},
+  {id:'p15',name:'Stella Artois LN',category:'Bar',unitType:'UN'},
+  {id:'p16',name:'Stella Artois LN Sem Glúten',category:'Bar',unitType:'UN'},
+  // Destilados
+  {id:'p17',name:'Aperitivo Cynar',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p18',name:'Aperitivo Lillet Branco',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p19',name:'Absinto',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p20',name:'Absolut',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p21',name:'Orloff',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p22',name:'Aperitivo Aperol',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p23',name:'Bacardi Ouro Gold',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p24',name:'Blend Vermute Tinto',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p25',name:'Bacardi Carta Blanca',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p26',name:'Bacardi Big Apple',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p27',name:'Bitter Angostura Aromatic',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p28',name:'Carpano Punt e Mes',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p29',name:'Campari',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p30',name:'Domecq',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p31',name:'Gelão (Negroni)',category:'Destilados',unitType:'UN'},
+  {id:'p32',name:'Gin Seagers',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p33',name:'Gin Tanqueray',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p34',name:'Martini Extra Dry',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p35',name:'Martini Rosato',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p36',name:'Martini Rosso',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p37',name:'Martini Bianco',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p38',name:'Sake Kyodai (Azuma)',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p39',name:'Tequila Ouro',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p40',name:'Tequila Prata',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p41',name:'Tequilero',category:'Destilados',unitType:'UN'},
+  {id:'p42',name:'Underberg',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p43',name:'Vodka Smirnoff',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  // Licores e Xaropes
+  {id:'p44',name:'Capim-Limão (líquido)',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p45',name:'Citron',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p46',name:'Espuma de Gengibre',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p47',name:'Licor Amaretto Dell Orso',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p48',name:'Licor Ballena - Morango e Tequila',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p49',name:'Licor Café',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p50',name:'Licor Creme de Doce de Leite',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p51',name:'Licor de Laranja',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p52',name:'Licor Espanhol 43',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p53',name:'Licor Jägermeister 700ml',category:'Licores e Xaropes',unitType:'VOL',bottleMl:700,tareG:null,density:1},
+  {id:'p54',name:'Licor Curaçau Blue',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p55',name:'Licor de Chocolate BID 720ml',category:'Licores e Xaropes',unitType:'VOL',bottleMl:720,tareG:null,density:1},
+  {id:'p56',name:'Licor de Pêssego',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p57',name:'Licor Menta',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p58',name:'Shrub de Kiwi',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p59',name:'Shrub de Morango',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p60',name:'Suco Retificado Abacaxi',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p61',name:'Xarope Cranberry',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p62',name:'Xarope de Camomila',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p63',name:'Xarope Dilute Citrus 500ml',category:'Licores e Xaropes',unitType:'VOL',bottleMl:500,tareG:null,density:1},
+  {id:'p64',name:'Xarope Frutas Vermelhas',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p65',name:'Xarope Limão Siciliano',category:'Licores e Xaropes',unitType:'UN'},
+  {id:'p66',name:'Xarope Maçã Verde',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p67',name:'Xarope Pêssego',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p68',name:'Xarope Simples',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p69',name:'Xarope de Grenadine',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p70',name:'Xarope de Maracujá',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  // Refri e Outros
+  {id:'p71',name:'Abacaxi com Casca Desidratado',category:'Refri e Outros',unitType:'KG'},
+  {id:'p72',name:'Ácido Cítrico',category:'Refri e Outros',unitType:'KG'},
+  {id:'p73',name:'Água de Coco',category:'Refri e Outros',unitType:'UN'},
+  {id:'p74',name:'Água de Flor de Laranjeira',category:'Refri e Outros',unitType:'VOL',bottleMl:null,tareG:null,density:1},
+  {id:'p75',name:'Água s/ Gás',category:'Refri e Outros',unitType:'UN'},
+  {id:'p76',name:'Açúcar',category:'Refri e Outros',unitType:'KG'},
+  {id:'p77',name:'Bala Caramelo Leite',category:'Refri e Outros',unitType:'KG'},
+  {id:'p78',name:'Camomila',category:'Refri e Outros',unitType:'KG'},
+  {id:'p79',name:'Canela em Pau',category:'Refri e Outros',unitType:'KG'},
+  {id:'p80',name:'Xarope de Gengibre',category:'Refri e Outros',unitType:'KG'},
+  {id:'p81',name:'Capim-Limão (folha)',category:'Refri e Outros',unitType:'KG'},
+  {id:'p82',name:'Cereja em Calda',category:'Refri e Outros',unitType:'KG'},
+  {id:'p83',name:'Cobertura de Chocolate',category:'Refri e Outros',unitType:'KG'},
+  {id:'p84',name:'Coca-Cola Lata',category:'Refri e Outros',unitType:'UN'},
+  {id:'p85',name:'Coca-Cola Zero Lata',category:'Refri e Outros',unitType:'UN'},
+  {id:'p86',name:'Coco Ralado',category:'Refri e Outros',unitType:'KG'},
+  {id:'p87',name:'Creme de Leite',category:'Refri e Outros',unitType:'KG'},
+];
+
+/* ---------- State ---------- */
+let state = {
+  products: [],
+  counts: {},
+  ui: { tab:'contagem', search:'', cadSearch:'', categoryFilter:'all', pendingOnly:false, collapsedCats:{} },
+};
+
+/* ---------- Storage ---------- */
+async function loadState(){
+  try{
+    const r = await window.storage.get('products', true);
+    state.products = r ? JSON.parse(r.value) : null;
+  }catch(e){ state.products = null; }
+  if(!state.products || !state.products.length){
+    state.products = DEFAULT_PRODUCTS.map(p=>({...p}));
+    await safeSet('products', state.products);
+  }
+  try{
+    const r = await window.storage.get('counts', true);
+    state.counts = r ? JSON.parse(r.value) : {};
+  }catch(e){ state.counts = {}; }
+  try{
+    const r = await window.storage.get('migrations', true);
+    state._migrations = r ? JSON.parse(r.value) : [];
+  }catch(e){ state._migrations = []; }
+  await applyMigrations();
+}
+
+/* ---------- One-time data migrations (safe to run on shared data: each runs once ever) ---------- */
+const TAREG_UPDATES = {
+  p1:539, p17:535, p18:585, p19:424, p20:643, p21:516, p22:538, p23:615, p24:430,
+  p25:615, p27:115, p28:564, p29:590, p30:572, p32:646, p33:561, p34:550, p35:550,
+  p36:550, p37:550, p38:408, p39:522, p40:522, p41:573, p42:875, p44:522, p45:522,
+  p47:620, p48:610, p49:533, p50:465, p51:550, p52:464, p53:619, p54:550, p55:533,
+  p56:533, p57:550, p58:590, p59:590, p61:465, p62:522, p64:465, p65:410, p66:465,
+  p67:450, p69:465, p70:465, p74:220
+};
+const UNIT_TYPE_FIXES = { p41:'VOL', p65:'VOL' };
+const RENAMES = {
+  p38:'Saquê Kyodai',
+  p54:'Licor Curaçau Blue (STOCK)',
+  p69:'Xarope de Grenadine (Monin)'
+};
+const NEW_PRODUCTS_MIGRATION = [
+  {id:'p88',name:"Ballantine's",category:'Destilados',unitType:'VOL',bottleMl:null,tareG:591,density:1},
+  {id:'p89',name:'Chivas',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:600,density:1},
+  {id:'p90',name:"Gin Gordon's",category:'Destilados',unitType:'VOL',bottleMl:null,tareG:430,density:1},
+  {id:'p91',name:"Jack Daniel's",category:'Destilados',unitType:'VOL',bottleMl:null,tareG:568,density:1},
+  {id:'p92',name:'Jameson',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:517,density:1},
+  {id:'p93',name:'Jim Beam',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:485,density:1},
+  {id:'p94',name:'Johnnie Walker Black Label 750ml',category:'Destilados',unitType:'VOL',bottleMl:750,tareG:395,density:1},
+  {id:'p95',name:'Johnnie Walker Black Label 1L',category:'Destilados',unitType:'VOL',bottleMl:1000,tareG:561,density:1},
+  {id:'p96',name:'Johnnie Walker Red Label',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:561,density:1},
+  {id:'p97',name:'Passport',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:579,density:1},
+  {id:'p98',name:'White Horse',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:601,density:1},
+  {id:'p99',name:"Jack Daniel's Honey",category:'Destilados',unitType:'VOL',bottleMl:null,tareG:568,density:1},
+  {id:'p100',name:"Jack Daniel's Apple",category:'Destilados',unitType:'VOL',bottleMl:null,tareG:568,density:1},
+  {id:'p101',name:"Jack Daniel's Fire",category:'Destilados',unitType:'VOL',bottleMl:null,tareG:568,density:1},
+  {id:'p102',name:'Xarope de Grenadine (BID)',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:533,density:1},
+  {id:'p103',name:'Xarope de Grenadine (fórmula)',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:450,density:1},
+  {id:'p104',name:'Xarope Frutas Vermelhas (fórmula)',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:450,density:1},
+  {id:'p105',name:'Licor Curaçau Blue (BID)',category:'Licores e Xaropes',unitType:'VOL',bottleMl:null,tareG:533,density:1},
+  {id:'p106',name:'Saquê Azuma',category:'Destilados',unitType:'VOL',bottleMl:null,tareG:400,density:1}
+];
+async function applyMigrations(){
+  const MID='bottle_weights_v1';
+  if(state._migrations.includes(MID)) return;
+  Object.keys(TAREG_UPDATES).forEach(id=>{
+    const p=getProduct(id);
+    if(p && p.tareG==null) p.tareG = TAREG_UPDATES[id];
+  });
+  Object.keys(UNIT_TYPE_FIXES).forEach(id=>{
+    const p=getProduct(id);
+    if(p) p.unitType = UNIT_TYPE_FIXES[id];
+  });
+  Object.keys(RENAMES).forEach(id=>{
+    const p=getProduct(id);
+    if(p) p.name = RENAMES[id];
+  });
+  NEW_PRODUCTS_MIGRATION.forEach(np=>{
+    if(!state.products.find(p=>p.id===np.id)) state.products.push({...np});
+  });
+  state._migrations.push(MID);
+  await safeSet('products', state.products);
+  await safeSet('migrations', state._migrations);
+}
+function getValueForKey(key){
+  if(key==='products') return state.products;
+  if(key==='counts') return state.counts;
+  if(key==='migrations') return state._migrations;
+}
+const pendingRetryTimers={};
+async function safeSet(key,val){
+  try{
+    await window.storage.set(key, JSON.stringify(val), true);
+    if(pendingRetryTimers[key]){
+      clearTimeout(pendingRetryTimers[key]);
+      delete pendingRetryTimers[key];
+      showToast('Conexão recuperada — dados sincronizados.');
+    }
+  }catch(e){
+    console.error('storage set failed',key,e);
+    const isNewFailure = !pendingRetryTimers[key];
+    if(isNewFailure) showToast('Sem conexão com o servidor — nada foi perdido, vou continuar tentando salvar.');
+    clearTimeout(pendingRetryTimers[key]);
+    pendingRetryTimers[key] = setTimeout(()=>safeSet(key, getValueForKey(key)), 4000);
+  }
+}
+let saveTimer=null;
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>safeSet('counts', state.counts), 500);
+}
+
+/* ---------- Helpers ---------- */
+function escapeHtml(s){ return String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s).replace(/"/g,'&quot;'); }
+function fmt(n,d){ return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n||0); }
+function getProduct(id){ return state.products.find(p=>p.id===id); }
+function getCategories(){ return [...new Set(state.products.map(p=>p.category))].sort((a,b)=>a.localeCompare(b)); }
+function missingConfigCount(){ return state.products.filter(p=>p.unitType==='VOL' && !p.bottleMl).length; }
+
+/* Net ml remaining in the open bottle. Returns null when it can't be computed yet
+   (weight mode without a registered tare, or no value typed in). */
+function computeOpenMl(p, c){
+  const mode = c.openMode || 'weight';
+  if(mode==='ml'){
+    if(c.openMl==null || c.openMl==='') return null;
+    return c.openMl;
+  }
+  if(p.tareG==null) return null;
+  if(c.openWeightG==null || c.openWeightG==='') return null;
+  return Math.max(0, c.openWeightG - p.tareG) / (p.density||1);
+}
+function computeTotal(p, cRaw){
+  const c = cRaw || {};
+  if(p.unitType==='UN') return {value:c.qty||0};
+  if(p.unitType==='KG') return {value:c.weightKg||0};
+  if(p.unitType==='VOL'){
+    const openMl = computeOpenMl(p,c);
+    const closedBottles = c.closedBottles||0;
+    const closedMl = p.bottleMl ? closedBottles*p.bottleMl : 0;
+    const incomplete = !p.bottleMl || openMl==null;
+    const totalMl = closedMl + (openMl||0);
+    return {value:totalMl, ml:totalMl, liters:totalMl/1000, incomplete, openMl, closedMl, closedBottles};
+  }
+}
+
+let toastTimer=null;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  if(!t) return;
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+/* ---------- Progress (signature jigger visual) ---------- */
+function progressSvg(pct){
+  const top=8, bottom=92, h=bottom-top;
+  const liquidH = h*(pct/100);
+  const liquidY = bottom-liquidH;
+  const ticks=[25,50,75].map(t=>{
+    const y = bottom - h*(t/100);
+    return `<line x1="5" y1="${y}" x2="11" y2="${y}" stroke="var(--muted)" stroke-width="1"/><line x1="49" y1="${y}" x2="55" y2="${y}" stroke="var(--muted)" stroke-width="1"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 60 104" class="jigger-svg" aria-hidden="true">
+    <defs>
+      <linearGradient id="liqGrad" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0%" stop-color="var(--amber-dim)"/>
+        <stop offset="100%" stop-color="var(--amber)"/>
+      </linearGradient>
+      <clipPath id="glassClip"><rect x="10" y="8" width="40" height="84" rx="4"/></clipPath>
+    </defs>
+    <rect x="10" y="8" width="40" height="84" rx="4" fill="var(--surface2)"/>
+    <g clip-path="url(#glassClip)"><rect x="10" y="${liquidY}" width="40" height="${liquidH}" fill="url(#liqGrad)"/></g>
+    ${ticks}
+    <rect x="10" y="8" width="40" height="84" rx="4" fill="none" stroke="var(--border)" stroke-width="1.5"/>
+  </svg>`;
+}
+function progressBlockHTML(){
+  const total=state.products.length;
+  const done=state.products.filter(p=>state.counts[p.id]&&state.counts[p.id].counted).length;
+  const pct = total? Math.round(done/total*100):0;
+  return `<div class="progress-inner">${progressSvg(pct)}
+    <div class="progress-copy">
+      <div class="progress-pct">${pct}%</div>
+      <div class="progress-sub">${done} de ${total} itens contados</div>
+    </div></div>`;
+}
+function updateProgress(){
+  const b=document.getElementById('progress-block');
+  if(b) b.innerHTML = progressBlockHTML();
+}
+
+/* ---------- Render: shell ---------- */
+function renderApp(){
+  const root=document.getElementById('app');
+  root.innerHTML = topbarHTML() + '<div id="view"></div><div id="modal-root"></div><div id="toast" class="toast"></div>';
+  renderActiveView();
+}
+function topbarHTML(){
+  const tabs=[['contagem','Contagem'],['cadastro','Cadastro'],['resumo','Resumo']];
+  return `<div class="topbar">
+    <div class="brand"><span class="brand-mark">●</span><span class="brand-name">Estoque Bar</span><span class="brand-sub">PAINEL COMPARTILHADO</span></div>
+    <div class="tabs">${tabs.map(([id,label])=>`<button class="tab ${state.ui.tab===id?'active':''}" data-action="switch-tab" data-tab="${id}">${label}</button>`).join('')}</div>
+  </div>`;
+}
+function renderActiveView(){
+  if(state.ui.tab==='contagem') renderContagem();
+  else if(state.ui.tab==='cadastro') renderCadastro();
+  else renderResumo();
+}
+
+/* ---------- Render: Contagem ---------- */
+function renderContagem(){
+  const view=document.getElementById('view');
+  const missing = missingConfigCount();
+  view.innerHTML = `
+    ${missing>0?`<div class="config-banner" data-action="switch-tab" data-tab="cadastro">⚠ ${missing}${missing===1?'item precisa':'itens precisam'} do volume da garrafa configurado — toque para ajustar no Cadastro</div>`:''}
+    <div class="progress-block" id="progress-block">${progressBlockHTML()}</div>
+    <div class="filters">
+      <input id="search-input" class="search-input" placeholder="Buscar produto..." value="${escapeAttr(state.ui.search)}"/>
+      <select id="cat-filter">${categoryFilterOptions()}</select>
+      <label class="check-inline"><input type="checkbox" id="pending-only" ${state.ui.pendingOnly?'checked':''}/> Só pendentes</label>
+    </div>
+    <div id="list-container"></div>
+  `;
+  renderList();
+}
+function categoryFilterOptions(){
+  const cats=getCategories();
+  return `<option value="all">Todas categorias</option>` + cats.map(c=>`<option value="${escapeAttr(c)}" ${state.ui.categoryFilter===c?'selected':''}>${escapeHtml(c)}</option>`).join('');
+}
+function renderList(){
+  const container=document.getElementById('list-container');
+  if(!container) return;
+  const term=state.ui.search.trim().toLowerCase();
+  const groups={};
+  state.products.forEach(p=>{
+    if(state.ui.categoryFilter!=='all' && p.category!==state.ui.categoryFilter) return;
+    if(term && !p.name.toLowerCase().includes(term)) return;
+    const counted = !!(state.counts[p.id] && state.counts[p.id].counted);
+    if(state.ui.pendingOnly && counted) return;
+    (groups[p.category]=groups[p.category]||[]).push(p);
+  });
+  let html='';
+  Object.keys(groups).sort((a,b)=>a.localeCompare(b)).forEach(cat=>{
+    const items=groups[cat];
+    const doneInCat=items.filter(p=>state.counts[p.id]&&state.counts[p.id].counted).length;
+    const collapsed=!!state.ui.collapsedCats[cat];
+    html+=`<div class="cat-group">
+      <button class="cat-header" data-action="toggle-cat" data-cat="${escapeAttr(cat)}">
+        <span class="chevron ${collapsed?'':'open'}">›</span>
+        <span class="cat-name">${escapeHtml(cat)}</span>
+        <span class="cat-count">${doneInCat}/${items.length}</span>
+      </button>
+      <div class="cat-items" style="${collapsed?'display:none;':''}">${items.map(renderItemCard).join('')}</div>
+    </div>`;
+  });
+  container.innerHTML = html || '<div class="empty-state">Nenhum item encontrado.</div>';
+}
+function renderItemCard(p){
+  const c=state.counts[p.id]||{};
+  const counted=!!c.counted;
+  let body='';
+  if(p.unitType==='UN'){
+    body=`<div class="tally">
+      <button data-action="dec" data-id="${p.id}" data-field="qty">−</button>
+      <input type="number" inputmode="numeric" class="tally-num" id="num-${p.id}-qty" data-id="${p.id}" data-field="qty" value="${c.qty||0}" min="0"/>
+      <button data-action="inc" data-id="${p.id}" data-field="qty">+</button>
+      <span class="tally-unit">UN</span>
+    </div>`;
+  } else if(p.unitType==='KG'){
+    body=`<div class="field-row">
+      <label>Peso total</label>
+      <input class="num-input" type="number" step="0.01" min="0" inputmode="decimal" data-id="${p.id}" data-field="weightKg" value="${c.weightKg??''}" placeholder="0.00"/>
+      <span class="unit-suffix">KG</span>
+    </div>`;
+  } else if(p.unitType==='VOL'){
+    const mode=c.openMode||'weight';
+    body=`
+      <div class="field-row">
+        <label>Garrafas fechadas${p.bottleMl?` (${p.bottleMl} ml cada)`:''}</label>
+        <div class="tally small">
+          <button data-action="dec" data-id="${p.id}" data-field="closedBottles">−</button>
+          <input type="number" inputmode="numeric" class="tally-num" id="num-${p.id}-closedBottles" data-id="${p.id}" data-field="closedBottles" value="${c.closedBottles||0}" min="0"/>
+          <button data-action="inc" data-id="${p.id}" data-field="closedBottles">+</button>
+        </div>
+      </div>
+      ${!p.bottleMl?'<div class="warn-row">⚠ Volume da garrafa não cadastrado — o total das fechadas em ml só fecha depois de configurar no Cadastro.</div>':''}
+      <div class="open-bottle-block">
+        <label>Garrafa aberta</label>
+        <div class="segmented">
+          <button class="seg ${mode==='weight'?'active':''}" data-action="set-mode" data-id="${p.id}" data-mode="weight">Pesar</button>
+          <button class="seg ${mode==='ml'?'active':''}" data-action="set-mode" data-id="${p.id}" data-mode="ml">Digitar ml</button>
+        </div>
+        ${mode==='weight'?`
+          <div class="field-row"><label>Peso na balança (garrafa + líquido)</label>
+            <input class="num-input" type="number" step="1" min="0" inputmode="decimal" data-id="${p.id}" data-field="openWeightG" value="${c.openWeightG??''}" placeholder="0"/>
+            <span class="unit-suffix">g</span>
+          </div>
+          ${p.tareG==null?'<div class="warn-row">⚠ Peso da garrafa vazia (tara) não cadastrado — cadastre no Cadastro para o sistema descontar automaticamente.</div>':''}
+        `:`
+          <div class="field-row"><label>Restante na garrafa</label>
+            <input class="num-input" type="number" step="1" min="0" inputmode="decimal" data-id="${p.id}" data-field="openMl" value="${c.openMl??''}" placeholder="0"/>
+            <span class="unit-suffix">ml</span>
+          </div>
+        `}
+      </div>
+      <div class="calc-line" id="calc-${p.id}">${formatCalcLine(p,c)}</div>`;
+  }
+  return `<div class="item-card ${counted?'counted':''}">
+    <div class="item-head">
+      <span class="item-name">${escapeHtml(p.name)}</span>
+      <label class="counted-toggle"><input type="checkbox" data-action="toggle-counted" data-id="${p.id}" ${counted?'checked':''}/> Contado</label>
+    </div>
+    ${body}
+  </div>`;
+}
+function formatCalcLine(p,c){
+  const t=computeTotal(p,c);
+  if(!t.incomplete){
+    return `Total: <strong>${fmt(t.ml,0)} ml</strong> <span class="muted">(${fmt(t.liters,2)} L)</span>`;
+  }
+  // Show whatever partial result we can, so the number is never hidden while cadastro is unfinished.
+  const bits=[];
+  if(p.bottleMl) bits.push(`fechadas: <strong>${fmt(t.closedMl,0)} ml</strong>`);
+  else if(t.closedBottles>0) bits.push(`${t.closedBottles} garrafa(s) fechada(s) — volume pendente`);
+  if(t.openMl!=null) bits.push(`aberta: <strong>${fmt(t.openMl,0)} ml</strong>`);
+  else {
+    const mode=c.openMode||'weight';
+    if(mode==='weight' && p.tareG==null && c.openWeightG) bits.push(`aberta: ${fmt(c.openWeightG,0)} g (falta cadastrar a tara)`);
+  }
+  const partial = bits.length? bits.join(' · ')+' — ' : '';
+  return `<span class="muted">${partial}total em ml pendente de cadastro.</span>`;
+}
+function updateCalcLine(id){
+  const el=document.getElementById('calc-'+id);
+  if(!el) return;
+  const p=getProduct(id), c=state.counts[id]||{};
+  el.innerHTML = formatCalcLine(p,c);
+}
+const WHOLE_FIELDS = ['qty','closedBottles'];
+function adjustField(id, field, delta){
+  const c = state.counts[id] || (state.counts[id]={});
+  c[field] = Math.max(0,(c[field]||0)+delta);
+  const numEl=document.getElementById(`num-${id}-${field}`);
+  if(numEl) numEl.value=c[field];
+  if(field==='closedBottles') updateCalcLine(id);
+  scheduleSave();
+}
+function onFieldInput(e){
+  const id=e.target.dataset.id, field=e.target.dataset.field;
+  const c = state.counts[id] || (state.counts[id]={});
+  let val = e.target.value===''? null : parseFloat(e.target.value);
+  if(val!=null && WHOLE_FIELDS.includes(field)) val = Math.max(0, Math.round(val));
+  c[field] = val;
+  const p=getProduct(id);
+  if(p && p.unitType==='VOL') updateCalcLine(id);
+  scheduleSave();
+}
+
+/* ---------- Render: Cadastro ---------- */
+function renderCadastro(){
+  const view=document.getElementById('view');
+  view.innerHTML=`
+    <div class="cadastro-head">
+      <input id="cad-search" placeholder="Buscar produto..." value="${escapeAttr(state.ui.cadSearch||'')}"/>
+      <button class="btn-primary" data-action="open-add-product">+ Novo</button>
+    </div>
+    <div id="cad-list"></div>
+  `;
+  renderCadList();
+}
+function renderCadList(){
+  const container=document.getElementById('cad-list');
+  if(!container) return;
+  const term=(state.ui.cadSearch||'').toLowerCase();
+  const groups={};
+  state.products.filter(p=>p.name.toLowerCase().includes(term)).sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{
+    (groups[p.category]=groups[p.category]||[]).push(p);
+  });
+  let html='';
+  Object.keys(groups).sort((a,b)=>a.localeCompare(b)).forEach(cat=>{
+    html+=`<div class="cat-label">${escapeHtml(cat)}</div>`;
+    groups[cat].forEach(p=>{
+      const badge = p.unitType==='UN'?'UN':p.unitType==='KG'?'KG':'VOL';
+      const needsSetup = p.unitType==='VOL' && !p.bottleMl;
+      html+=`<div class="cad-row" data-action="edit-product" data-id="${p.id}">
+        <span class="cad-name">${escapeHtml(p.name)}</span>
+        <span class="badge badge-${badge.toLowerCase()}">${badge}</span>
+        ${needsSetup?'<span class="badge badge-warn">configurar</span>':''}
+      </div>`;
+    });
+  });
+  container.innerHTML = html || '<div class="empty-state">Nenhum produto encontrado.</div>';
+}
+function productModalHTML(p){
+  const isEdit=!!p;
+  const cats=getCategories();
+  const catOptions=cats.map(c=>`<option value="${escapeAttr(c)}" ${p&&p.category===c?'selected':''}>${escapeHtml(c)}</option>`).join('');
+  const unitType = p?p.unitType:'VOL';
+  return `<div class="modal-overlay" data-action="overlay-close">
+    <div class="modal">
+      <div class="modal-head"><h3>${isEdit?'Editar produto':'Novo produto'}</h3><button class="icon-btn" data-action="close-modal">✕</button></div>
+      <div class="modal-body">
+        <div class="form-row"><label>Nome do produto</label>
+          <input id="f-name" type="text" value="${p?escapeAttr(p.name):''}" placeholder="Ex: Tanqueray"/>
+        </div>
+        <div class="form-row"><label>Categoria</label>
+          <select id="f-category">${catOptions}<option value="__new__">+ Nova categoria...</option></select>
+          <input id="f-category-new" type="text" placeholder="Nome da nova categoria" style="display:none;margin-top:6px;"/>
+        </div>
+        <div class="form-row"><label>Tipo de unidade</label>
+          <select id="f-unitType">
+            <option value="UN" ${unitType==='UN'?'selected':''}>Unidade (garrafas fechadas / latas)</option>
+            <option value="VOL" ${unitType==='VOL'?'selected':''}>Volume (garrafas + peso da aberta)</option>
+            <option value="KG" ${unitType==='KG'?'selected':''}>Peso (KG)</option>
+          </select>
+        </div>
+        <div id="vol-fields" style="${unitType==='VOL'?'':'display:none;'}">
+          <div class="form-row"><label>Volume da garrafa cheia (ml)</label>
+            <input id="f-bottleMl" type="number" min="0" step="1" value="${p&&p.bottleMl!=null?p.bottleMl:''}" placeholder="Ex: 1000"/>
+          </div>
+          <div class="form-row"><label>Peso da garrafa vazia — tara (g)</label>
+            <input id="f-tareG" type="number" min="0" step="1" value="${p&&p.tareG!=null?p.tareG:''}" placeholder="Pese a garrafa vazia uma vez"/>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        ${isEdit?`<button class="btn-danger" data-action="delete-product" data-id="${p.id}">Excluir</button>`:'<span></span>'}
+        <div><button class="btn-ghost" data-action="close-modal">Cancelar</button><button class="btn-primary" data-action="save-product" data-id="${isEdit?p.id:''}">Salvar</button></div>
+      </div>
+    </div>
+  </div>`;
+}
+function openModal(html){ document.getElementById('modal-root').innerHTML = html; }
+function closeModal(){ const m=document.getElementById('modal-root'); if(m) m.innerHTML=''; }
+function saveProductFromForm(id){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){ showToast('Informe o nome do produto.'); return; }
+  let category=document.getElementById('f-category').value;
+  if(category==='__new__'){
+    category=document.getElementById('f-category-new').value.trim();
+    if(!category){ showToast('Informe o nome da nova categoria.'); return; }
+  }
+  const unitType=document.getElementById('f-unitType').value;
+  let bottleMl=null, tareG=null, density=1;
+  if(unitType==='VOL'){
+    const bm=document.getElementById('f-bottleMl').value;
+    const tr=document.getElementById('f-tareG').value;
+    bottleMl = bm===''?null:parseFloat(bm);
+    tareG = tr===''?null:parseFloat(tr);
+  }
+  if(id){
+    Object.assign(getProduct(id), {name,category,unitType,bottleMl,tareG,density});
+  } else {
+    state.products.push({id:'p'+Date.now()+Math.floor(Math.random()*1000), name,category,unitType,bottleMl,tareG,density});
+  }
+  safeSet('products', state.products);
+  closeModal();
+  renderCadastro();
+  showToast('Produto salvo.');
+}
+function deleteProduct(id){
+  showConfirm('Tem certeza que quer excluir este produto? A contagem dele também será removida.', ()=>{
+    state.products = state.products.filter(p=>p.id!==id);
+    delete state.counts[id];
+    safeSet('products', state.products);
+    safeSet('counts', state.counts);
+    renderCadastro();
+    showToast('Produto excluído.');
+  }, {danger:true, okLabel:'Excluir'});
+}
+
+/* ---------- Custom confirm dialog (does not rely on the browser's native confirm()) ---------- */
+let pendingConfirmCallback=null;
+function showConfirm(message, onConfirm, opts={}){
+  pendingConfirmCallback = onConfirm;
+  openModal(`<div class="modal-overlay" data-action="confirm-cancel">
+    <div class="modal confirm-modal">
+      <div class="modal-body"><p class="confirm-message">${escapeHtml(message)}</p></div>
+      <div class="modal-foot"><span></span><div>
+        <button class="btn-ghost" data-action="confirm-cancel">Cancelar</button>
+        <button class="${opts.danger?'btn-danger-solid':'btn-primary'}" data-action="confirm-ok">${escapeHtml(opts.okLabel||'Confirmar')}</button>
+      </div></div>
+    </div>
+  </div>`);
+}
+
+/* ---------- Render: Resumo ---------- */
+function renderResumo(){
+  const view=document.getElementById('view');
+  const rows=state.products.slice().sort((a,b)=>a.category.localeCompare(b.category)||a.name.localeCompare(b.name));
+  const total=state.products.length;
+  const counted=state.products.filter(p=>state.counts[p.id]&&state.counts[p.id].counted).length;
+  view.innerHTML=`
+    <div class="resumo-head">
+      <div><div class="resumo-title">Resumo da contagem</div><div class="resumo-sub">${counted} de ${total} itens contados</div></div>
+      <div class="resumo-actions">
+        <button class="btn-ghost" data-action="reset-counts">Iniciar nova contagem</button>
+        <button class="btn-ghost" data-action="export-csv">Baixar CSV</button>
+        <button class="btn-primary" style="background-color: #0F9D58; color: #fff;" data-action="copy-sheets">Copiar p/ Planilha</button>
+      </div>
+    </div>
+    <div class="table-wrap"><table class="resumo-table">
+      <thead><tr><th>Categoria</th><th>Item</th><th>Total</th><th>Status</th></tr></thead>
+      <tbody>${rows.map(p=>{
+        const c=state.counts[p.id];
+        const t=computeTotal(p,c);
+        let totalStr;
+        if(p.unitType==='UN') totalStr=`${fmt(t.value,0)} UN`;
+        else if(p.unitType==='KG') totalStr=`${fmt(t.value,2)} KG`;
+        else totalStr = t.incomplete?'—':`${fmt(t.liters,2)} L`;
+        const st = c&&c.counted?'contado':'pendente';
+        return `<tr><td>${escapeHtml(p.category)}</td><td>${escapeHtml(p.name)}</td><td class="mono">${totalStr}</td><td><span class="status-pill status-${st}">${st==='contado'?'Contado':'Pendente'}</span></td></tr>`;
+      }).join('')}</tbody>
+    </table></div>
+  `;
+}
+function csvEscape(v){
+  v=String(v??'');
+  if(/[",\n\r]/.test(v)) return '"'+v.replace(/"/g,'""')+'"';
+  return v;
+}
+function exportCsv(){
+  const rows=[['Item','Total','Unidade']];
+  state.products.slice().sort((a,b)=>a.category.localeCompare(b.category)||a.name.localeCompare(b.name)).forEach(p=>{
+    const c=state.counts[p.id];
+    const t=computeTotal(p,c);
+    let totalStr='', unidade='';
+    if(p.unitType==='UN'){ totalStr=(t.value||0).toFixed(0); unidade='UN'; }
+    else if(p.unitType==='KG'){ totalStr=(t.value||0).toFixed(2); unidade='KG'; }
+    else {
+      if(!t.incomplete){ totalStr=t.liters.toFixed(2); unidade='L'; }
+      else { totalStr='0'; unidade='L'; }
+    }
+    rows.push([p.name,totalStr,unidade]);
+  });
+  const csv='\uFEFF'+rows.map(r=>r.map(csvEscape).join(',')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const d=new Date().toISOString().slice(0,10);
+  a.href=url; a.download=`contagem-estoque-${d}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Planilha baixada com sucesso.');
+}
+async function copySheets(){
+  const rows = [['Item', 'Total', 'Unidade']];
+  state.products.slice().sort((a,b)=>a.category.localeCompare(b.category)||a.name.localeCompare(b.name)).forEach(p=>{
+    const c = state.counts[p.id];
+    const t = computeTotal(p,c);
+    let totalStr = '', unidade = '';
+    if(p.unitType === 'UN'){ 
+      totalStr = (t.value || 0).toFixed(0); 
+      unidade = 'UN'; 
+    }
+    else if(p.unitType === 'KG'){ 
+      totalStr = (t.value || 0).toFixed(2).replace('.', ','); 
+      unidade = 'KG'; 
+    }
+    else {
+      if(!t.incomplete){ 
+        totalStr = t.liters.toFixed(2).replace('.', ','); 
+        unidade = 'L'; 
+      } else { 
+        totalStr = '0'; 
+        unidade = 'L'; 
+      }
+    }
+    rows.push([p.name, totalStr, unidade]);
+  });
+
+  const tsv = rows.map(r => r.join('\t')).join('\n');
+  try {
+    await navigator.clipboard.writeText(tsv);
+    showToast('Copiado! Abra o Google Sheets e cole (Ctrl+V / Cmd+V).');
+  } catch (err) {
+    console.error(err);
+    showToast('Erro ao copiar. Seu navegador pode não suportar essa função.');
+  }
+}
+function resetCounts(){
+  showConfirm('Tem certeza que quer iniciar uma nova contagem? Isso vai zerar todos os valores já contados (o cadastro de produtos é mantido).', ()=>{
+    state.counts={};
+    safeSet('counts', state.counts);
+    renderActiveView();
+    showToast('Nova contagem iniciada.');
+  }, {danger:true, okLabel:'Zerar e recomeçar'});
+}
+
+/* ---------- Events ---------- */
+function onAppClick(e){
+  const el=e.target.closest('[data-action]');
+  if(!el) return;
+  const action=el.dataset.action, id=el.dataset.id;
+  switch(action){
+    case 'switch-tab': state.ui.tab=el.dataset.tab; renderApp(); break;
+    case 'inc': adjustField(id, el.dataset.field, +1); break;
+    case 'dec': adjustField(id, el.dataset.field, -1); break;
+    case 'set-mode': { const c=state.counts[id]||(state.counts[id]={}); c.openMode=el.dataset.mode; scheduleSave(); renderList(); break; }
+    case 'toggle-cat': state.ui.collapsedCats[el.dataset.cat]=!state.ui.collapsedCats[el.dataset.cat]; renderList(); break;
+    case 'open-add-product': openModal(productModalHTML(null)); break;
+    case 'edit-product': openModal(productModalHTML(getProduct(id))); break;
+    case 'close-modal': closeModal(); break;
+    case 'overlay-close': if(e.target===el) closeModal(); break;
+    case 'confirm-ok': { const cb=pendingConfirmCallback; pendingConfirmCallback=null; closeModal(); if(cb) cb(); break; }
+    case 'confirm-cancel': { const isOverlay = el.classList.contains('modal-overlay'); if(!isOverlay || e.target===el){ pendingConfirmCallback=null; closeModal(); } break; }
+    case 'save-product': saveProductFromForm(id||null); break;
+    case 'delete-product': deleteProduct(id); break;
+    case 'export-csv': exportCsv(); break;
+    case 'copy-sheets': copySheets(); break;
+    case 'reset-counts': resetCounts(); break;
+  }
+}
+function onAppInput(e){
+  if(e.target.id==='search-input'){ state.ui.search=e.target.value; renderList(); return; }
+  if(e.target.id==='cad-search'){ state.ui.cadSearch=e.target.value; renderCadList(); return; }
+  if(e.target.dataset && e.target.dataset.field && e.target.dataset.id){ onFieldInput(e); }
+}
+function onAppChange(e){
+  if(e.target.id==='cat-filter'){ state.ui.categoryFilter=e.target.value; renderList(); return; }
+  if(e.target.id==='pending-only'){ state.ui.pendingOnly=e.target.checked; renderList(); return; }
+  if(e.target.dataset.action==='toggle-counted'){
+    const id=e.target.dataset.id;
+    const c=state.counts[id]||(state.counts[id]={});
+    c.counted=e.target.checked;
+    scheduleSave(); updateProgress(); renderList();
+    return;
+  }
+  if(e.target.id==='f-unitType'){ const vf=document.getElementById('vol-fields'); if(vf) vf.style.display=e.target.value==='VOL'?'':'none'; return; }
+  if(e.target.id==='f-category'){ const nf=document.getElementById('f-category-new'); if(nf) nf.style.display=e.target.value==='__new__'?'':'none'; return; }
+}
+
+/* ---------- Init ---------- */
+function initListeners(){
+  const app=document.getElementById('app');
+  app.addEventListener('click', onAppClick);
+  app.addEventListener('input', onAppInput);
+  app.addEventListener('change', onAppChange);
+}
+initListeners();
+loadState().then(renderApp);
+</script>
+</body>
+</html>
